@@ -35,7 +35,7 @@ def home():
     return render_template('index.html')
 
 
-@app.route('/api/predict', methods=['POST'])
+@app.route('/predict', methods=['POST'])
 def predict():
     import cv2
 
@@ -123,7 +123,7 @@ def predict():
             pass
 
 
-@app.route('/api/health')
+@app.route('/health')
 def health():
     return jsonify({'status': 'ok'})
 
