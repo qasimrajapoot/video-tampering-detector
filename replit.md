@@ -1,45 +1,45 @@
-# [Project name]
+# VideoGuard — AI Video Tampering Detector
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A web app that uses a trained deep learning model to detect tampering in uploaded videos. Users upload a video, the model analyzes sampled frames, and returns a verdict (Authentic / Tampered) with a confidence score and per-frame breakdown.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- **Flask app**: `python artifacts/flask-app/app.py` (port 5000)
+- **Workflow**: `Start application` — runs the Flask backend
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- **Backend**: Python + Flask
+- **ML**: TensorFlow / Keras (`tamper_model.h5`)
+- **Video**: OpenCV (`opencv-python-headless`)
+- **Frontend**: Jinja2 templates + Tailwind CSS CDN + Vanilla JS (single-page, no build step)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/flask-app/app.py` — Flask routes and model inference logic
+- `artifacts/flask-app/tamper_model.h5` — Trained Keras model (13MB)
+- `artifacts/flask-app/templates/index.html` — Full single-page UI
+- `artifacts/flask-app/uploads/` — Temp upload folder (files deleted after analysis)
+- `artifacts/flask-app/requirements.txt` — Python dependencies
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Every 10th frame is sampled from the video and resized to 128×128 before inference — matches the original training setup.
+- Uploaded files are deleted immediately after analysis to save disk space.
+- Model is loaded lazily on first request to avoid slow server startup.
+- JSON API at `/api/predict` keeps the frontend decoupled from Flask templating.
+- `opencv-python-headless` is used instead of `opencv-python` since there's no display server.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
-
-## User preferences
-
-_Populate as you build — explicit user instructions worth remembering across sessions._
+Users upload a video (MP4, AVI, MOV, MKV, WebM — up to 500MB). The app extracts frames, runs each through the tampering detection model, and returns:
+- **Verdict**: Authentic or Tampered
+- **Confidence**: percentage certainty
+- **Frame chart**: per-frame tampering probability bar chart
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- The model expects 128×128 RGB frames normalized to [0, 1].
+- TensorFlow emits INFO logs to stderr on startup — these are harmless.
+- Do NOT run `pnpm run dev` at workspace root — it has no dev script.
+- Always check that the `Start application` workflow is running before testing.

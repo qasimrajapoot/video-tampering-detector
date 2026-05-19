@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VideoGuard — Video Tampering Detector</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    .gradient-bg {
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+    }
+
+    .card-glass {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(20px);
+    }
+
+    .drop-zone {
+      background: rgba(99,102,241,0.04);
+      border: 2px dashed rgba(99,102,241,0.3);
+      transition: all 0.3s ease;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      background: rgba(99,102,241,0.1);
+      border-color: rgba(99,102,241,0.7);
+      transform: scale(1.01);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      transition: all 0.3s ease;
+      box-shadow: 0 0 20px rgba(99,102,241,0.3);
+    }
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 0 30px rgba(99,102,241,0.5);
+    }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .progress-bar {
+      background: linear-gradient(90deg, #6366f1, #8b5cf6, #ec4899);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .verdict-tampered {
+      background: linear-gradient(135deg, rgba(239,68,68,0.15), rgba(220,38,38,0.05));
+      border: 1px solid rgba(239,68,68,0.3);
+    }
+    .verdict-authentic {
+      background: linear-gradient(135deg, rgba(34,197,94,0.15), rgba(22,163,74,0.05));
+      border: 1px solid rgba(34,197,94,0.3);
+    }
+
+    .frame-bar {
+      transition: width 0.5s ease;
+    }
+
+    .pulse-dot {
+      animation: pulse-dot 1.4s infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.6s ease forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .slide-up {
+      animation: slideUp 0.4s ease forwards;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+    ::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.4); border-radius: 3px; }
+  </style>
+</head>
+<body class="gradient-bg min-h-screen text-white">
+
+  <!-- Header -->
+  <header class="border-b border-white/[0.06] px-6 py-4">
+    <div class="max-w-5xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
+          <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+          </svg>
+        </div>
+        <span class="font-semibold text-white tracking-tight">VideoGuard</span>
+        <span class="text-xs text-white/30 font-normal">AI Forensics</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
+        <span class="text-xs text-white/40 mono">model ready</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-6 py-12">
+
+    <!-- Hero -->
+    <div class="text-center mb-12 fade-in">
+      <h1 class="text-4xl md:text-5xl font-bold mb-4 tracking-tight">
+        Detect Video
+        <span class="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+          Tampering
+        </span>
+      </h1>
+      <p class="text-white/50 text-lg max-w-xl mx-auto leading-relaxed">
+        Upload any video and our deep learning model will analyze each frame for signs of digital manipulation or tampering.
+      </p>
+    </div>
+
+    <!-- Upload Card -->
+    <div id="upload-section" class="card-glass rounded-2xl p-8 mb-6 fade-in">
+      <div
+        id="drop-zone"
+        class="drop-zone rounded-xl p-12 text-center cursor-pointer"
+        onclick="document.getElementById('file-input').click()"
+      >
+        <input type="file" id="file-input" accept="video/*" class="hidden" />
+
+        <div id="upload-idle">
+          <div class="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mx-auto mb-5">
+            <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+            </svg>
+          </div>
+          <p class="text-white/70 font-medium mb-1">Drop your video here or click to browse</p>
+          <p class="text-white/30 text-sm">MP4, AVI, MOV, MKV, WebM — up to 500MB</p>
+        </div>
+
+        <div id="upload-selected" class="hidden">
+          <div class="w-16 h-16 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center mx-auto mb-5">
+            <svg class="w-8 h-8 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <p id="selected-name" class="text-white font-semibold mb-1 truncate max-w-xs mx-auto"></p>
+          <p id="selected-size" class="text-white/40 text-sm"></p>
+        </div>
+      </div>
+
+      <!-- Analyze Button -->
+      <button
+        id="analyze-btn"
+        class="btn-primary w-full mt-5 py-3.5 rounded-xl font-semibold text-white text-sm tracking-wide disabled:opacity-40"
+        disabled
+        onclick="analyzeVideo()"
+      >
+        Analyze Video
+      </button>
+    </div>
+
+    <!-- Progress Card -->
+    <div id="progress-section" class="hidden card-glass rounded-2xl p-8 mb-6 slide-up">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
+          <svg class="w-4 h-4 text-purple-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+        </div>
+        <div>
+          <p class="font-semibold text-white text-sm">Analyzing video...</p>
+          <p id="progress-status" class="text-white/40 text-xs mono">Initializing model</p>
+        </div>
+      </div>
+
+      <div class="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
+        <div id="progress-bar" class="progress-bar h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+      </div>
+      <div class="flex justify-between mt-2">
+        <span class="text-white/30 text-xs mono">Frame analysis</span>
+        <span id="progress-pct" class="text-white/40 text-xs mono">0%</span>
+      </div>
+    </div>
+
+    <!-- Results Card -->
+    <div id="result-section" class="hidden slide-up">
+
+      <!-- Verdict -->
+      <div id="verdict-card" class="rounded-2xl p-8 mb-6">
+        <div class="flex flex-col md:flex-row md:items-center gap-6">
+          <div id="verdict-icon" class="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 mx-auto md:mx-0">
+          </div>
+          <div class="text-center md:text-left">
+            <p class="text-white/50 text-sm uppercase tracking-widest font-medium mb-1">Analysis Result</p>
+            <h2 id="verdict-text" class="text-4xl font-bold mb-2"></h2>
+            <p id="verdict-desc" class="text-white/50 text-sm"></p>
+          </div>
+          <div class="md:ml-auto text-center">
+            <p class="text-white/40 text-xs uppercase tracking-wider mb-1">Confidence</p>
+            <p id="confidence-text" class="text-5xl font-bold mono"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="card-glass rounded-xl p-4 text-center">
+          <p class="text-white/40 text-xs uppercase tracking-wider mb-2">Raw Score</p>
+          <p id="stat-score" class="text-xl font-bold mono text-indigo-300"></p>
+        </div>
+        <div class="card-glass rounded-xl p-4 text-center">
+          <p class="text-white/40 text-xs uppercase tracking-wider mb-2">Total Frames</p>
+          <p id="stat-total" class="text-xl font-bold mono text-white"></p>
+        </div>
+        <div class="card-glass rounded-xl p-4 text-center">
+          <p class="text-white/40 text-xs uppercase tracking-wider mb-2">Analyzed</p>
+          <p id="stat-analyzed" class="text-xl font-bold mono text-white"></p>
+        </div>
+        <div class="card-glass rounded-xl p-4 text-center">
+          <p class="text-white/40 text-xs uppercase tracking-wider mb-2">Duration</p>
+          <p id="stat-duration" class="text-xl font-bold mono text-white"></p>
+        </div>
+      </div>
+
+      <!-- Frame Analysis Chart -->
+      <div class="card-glass rounded-2xl p-8 mb-6">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h3 class="font-semibold text-white text-sm">Frame-by-Frame Analysis</h3>
+            <p class="text-white/40 text-xs mt-0.5">Tampering probability per sampled frame</p>
+          </div>
+          <div class="flex items-center gap-4 text-xs text-white/40">
+            <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>Authentic</span>
+            <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-red-400"></span>Tampered</span>
+          </div>
+        </div>
+
+        <div id="frame-chart" class="space-y-1.5 max-h-80 overflow-y-auto pr-2">
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex gap-3">
+        <button onclick="resetApp()" class="flex-1 py-3 rounded-xl border border-white/10 text-white/70 hover:text-white hover:border-white/20 text-sm font-medium transition-all">
+          Analyze Another Video
+        </button>
+        <button onclick="copyResult()" class="px-6 py-3 rounded-xl border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/10 text-sm font-medium transition-all">
+          Copy Report
+        </button>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div id="error-section" class="hidden card-glass rounded-2xl p-6 border border-red-500/20 bg-red-500/5 slide-up">
+      <div class="flex items-start gap-3">
+        <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <div>
+          <p class="text-red-300 font-medium text-sm">Analysis Failed</p>
+          <p id="error-message" class="text-red-400/70 text-sm mt-0.5"></p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-white/[0.04] px-6 py-6 mt-12">
+    <div class="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-2">
+      <p class="text-white/20 text-xs">VideoGuard — AI-powered video forensics</p>
+      <p class="text-white/20 text-xs mono">Deep Learning · TensorFlow · OpenCV</p>
+    </div>
+  </footer>
+
+  <script>
+    let selectedFile = null;
+    let analysisResult = null;
+
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+
+    // Drag and drop
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const files = e.dataTransfer.files;
+      if (files.length > 0) handleFileSelect(files[0]);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) handleFileSelect(e.target.files[0]);
+    });
+
+    function handleFileSelect(file) {
+      if (!file.type.startsWith('video/')) {
+        showError('Please select a valid video file.');
+        return;
+      }
+      selectedFile = file;
+
+      document.getElementById('upload-idle').classList.add('hidden');
+      document.getElementById('upload-selected').classList.remove('hidden');
+      document.getElementById('selected-name').textContent = file.name;
+      document.getElementById('selected-size').textContent = formatBytes(file.size);
+      document.getElementById('analyze-btn').disabled = false;
+
+      document.getElementById('result-section').classList.add('hidden');
+      document.getElementById('error-section').classList.add('hidden');
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function formatDuration(seconds) {
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      return m > 0 ? `${m}m ${s}s` : `${s}s`;
+    }
+
+    async function analyzeVideo() {
+      if (!selectedFile) return;
+
+      document.getElementById('analyze-btn').disabled = true;
+      document.getElementById('result-section').classList.add('hidden');
+      document.getElementById('error-section').classList.add('hidden');
+      document.getElementById('progress-section').classList.remove('hidden');
+
+      const progressBar = document.getElementById('progress-bar');
+      const progressStatus = document.getElementById('progress-status');
+      const progressPct = document.getElementById('progress-pct');
+
+      // Simulate progress stages
+      const stages = [
+        { pct: 10, msg: 'Uploading video...' },
+        { pct: 25, msg: 'Loading model weights...' },
+        { pct: 40, msg: 'Extracting frames...' },
+        { pct: 70, msg: 'Running inference...' },
+        { pct: 90, msg: 'Computing verdict...' },
+      ];
+
+      let stageIdx = 0;
+      const interval = setInterval(() => {
+        if (stageIdx < stages.length) {
+          const stage = stages[stageIdx];
+          progressBar.style.width = stage.pct + '%';
+          progressPct.textContent = stage.pct + '%';
+          progressStatus.textContent = stage.msg;
+          stageIdx++;
+        }
+      }, 1200);
+
+      const formData = new FormData();
+      formData.append('video', selectedFile);
+
+      try {
+        const response = await fetch('/api/predict', {
+          method: 'POST',
+          body: formData,
+        });
+
+        clearInterval(interval);
+        progressBar.style.width = '100%';
+        progressPct.textContent = '100%';
+        progressStatus.textContent = 'Complete!';
+
+        await new Promise(r => setTimeout(r, 400));
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Analysis failed');
+        }
+
+        showResults(data);
+      } catch (err) {
+        clearInterval(interval);
+        document.getElementById('progress-section').classList.add('hidden');
+        showError(err.message || 'An unexpected error occurred. Please try again.');
+        document.getElementById('analyze-btn').disabled = false;
+      }
+    }
+
+    function showResults(data) {
+      analysisResult = data;
+      document.getElementById('progress-section').classList.add('hidden');
+
+      const verdictCard = document.getElementById('verdict-card');
+      const verdictText = document.getElementById('verdict-text');
+      const verdictDesc = document.getElementById('verdict-desc');
+      const verdictIcon = document.getElementById('verdict-icon');
+      const confidenceText = document.getElementById('confidence-text');
+
+      if (data.tampered) {
+        verdictCard.className = 'verdict-tampered rounded-2xl p-8 mb-6';
+        verdictText.textContent = 'Tampered';
+        verdictText.className = 'text-4xl font-bold mb-2 text-red-400';
+        verdictDesc.textContent = 'This video shows signs of digital manipulation or editing.';
+        confidenceText.className = 'text-5xl font-bold mono text-red-400';
+        verdictIcon.className = 'w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 mx-auto md:mx-0 bg-red-500/10 border border-red-500/20';
+        verdictIcon.innerHTML = `<svg class="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>`;
+      } else {
+        verdictCard.className = 'verdict-authentic rounded-2xl p-8 mb-6';
+        verdictText.textContent = 'Authentic';
+        verdictText.className = 'text-4xl font-bold mb-2 text-emerald-400';
+        verdictDesc.textContent = 'No signs of tampering or digital manipulation detected.';
+        confidenceText.className = 'text-5xl font-bold mono text-emerald-400';
+        verdictIcon.className = 'w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 mx-auto md:mx-0 bg-emerald-500/10 border border-emerald-500/20';
+        verdictIcon.innerHTML = `<svg class="w-10 h-10 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+      }
+
+      confidenceText.textContent = data.confidence + '%';
+      document.getElementById('stat-score').textContent = data.raw_score.toFixed(4);
+      document.getElementById('stat-total').textContent = data.total_frames.toLocaleString();
+      document.getElementById('stat-analyzed').textContent = data.analyzed_frames;
+      document.getElementById('stat-duration').textContent = formatDuration(data.duration_seconds);
+
+      // Frame chart
+      const chart = document.getElementById('frame-chart');
+      chart.innerHTML = '';
+      data.frame_analysis.forEach((f, i) => {
+        const barWidth = Math.round(f.score * 100);
+        const isTampered = f.tampered;
+        const color = isTampered ? 'bg-red-400' : 'bg-emerald-400';
+        const textColor = isTampered ? 'text-red-400' : 'text-emerald-400';
+
+        chart.innerHTML += `
+          <div class="flex items-center gap-3 group">
+            <span class="text-white/30 text-xs mono w-14 flex-shrink-0 text-right">#${f.frame}</span>
+            <div class="flex-1 bg-white/5 rounded-full h-1.5 overflow-hidden">
+              <div class="frame-bar ${color} h-full rounded-full opacity-80" style="width: ${barWidth}%"></div>
+            </div>
+            <span class="${textColor} text-xs mono w-12 flex-shrink-0">${(f.score * 100).toFixed(1)}%</span>
+          </div>
+        `;
+      });
+
+      document.getElementById('result-section').classList.remove('hidden');
+    }
+
+    function showError(msg) {
+      document.getElementById('error-message').textContent = msg;
+      document.getElementById('error-section').classList.remove('hidden');
+    }
+
+    function resetApp() {
+      selectedFile = null;
+      analysisResult = null;
+      document.getElementById('upload-idle').classList.remove('hidden');
+      document.getElementById('upload-selected').classList.add('hidden');
+      document.getElementById('analyze-btn').disabled = true;
+      document.getElementById('result-section').classList.add('hidden');
+      document.getElementById('error-section').classList.add('hidden');
+      document.getElementById('progress-section').classList.add('hidden');
+      document.getElementById('progress-bar').style.width = '0%';
+      fileInput.value = '';
+    }
+
+    function copyResult() {
+      if (!analysisResult) return;
+      const r = analysisResult;
+      const text = [
+        'VideoGuard Analysis Report',
+        '==========================',
+        `File: ${r.filename}`,
+        `Verdict: ${r.verdict}`,
+        `Confidence: ${r.confidence}%`,
+        `Raw Score: ${r.raw_score}`,
+        `Total Frames: ${r.total_frames}`,
+        `Analyzed Frames: ${r.analyzed_frames}`,
+        `Duration: ${formatDuration(r.duration_seconds)}`,
+      ].join('\n');
+
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy Report', 2000);
+      });
+    }
+  </script>
+</body>
+</html>
